@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "The Annotator",
+  "version": "1.0.0",
+  "description": "One stop solution for all your annotating needs",
+  "icons": {
+    "16": "16.png.png",
+    "32": "32.png.png",
+    "48": "48.png.png",
+    "128": "128.png.png"
+  },
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting",
+    "webNavigation",
+    "declarativeContent",
+    "clipboardRead",
+    "clipboardWrite",
+    "downloads",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"]
+    }
+  ]
+}
