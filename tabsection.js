@@ -193,7 +193,7 @@ filterButton.addEventListener('click', () => {
         if (typeof chrome !== 'undefined' && chrome.tabs) {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 const activeTab = tabs[0];
-                chrome.tabs.sendMessage(activeTab.id, { from: "contentScript", subject: "captureWebpage" }, (response) => {
+                chrome.tabs.sendMessage(activeTab.id, { from: "contentScript", action: "captureWebpage" }, (response) => {
                     if (response && response.success) {
                         console.log('Page saved successfully.');
                     } else {
@@ -216,7 +216,7 @@ filterButton.addEventListener('click', () => {
         if (typeof chrome !== 'undefined' && chrome.tabs) {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 const activeTab = tabs[0];
-                chrome.tabs.sendMessage(activeTab.id, { from: "contentScript", subject: "shareWebpage" }, (response) => {
+                chrome.tabs.sendMessage(activeTab.id, { from: "contentScript", action: "shareWebpage" }, (response) => {
                     if (response && response.success) {
                         console.log('Page shared successfully.');
                     } else {

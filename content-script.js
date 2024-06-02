@@ -1,7 +1,7 @@
-// import {jsPDF} from 'js/jspdf.umd.min.js'
-
+// import { jsPDF } from 'js/jspdf.umd.min.js';
 
 function applyHighlight(color, WebsiteHostName) {
+    console.log("Entered apply highlight");
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     let selectedText = selection.toString();
@@ -25,29 +25,105 @@ function applyHighlight(color, WebsiteHostName) {
         id: span.getAttribute("data-highlight-id"),
         date: new Date().toISOString()
     });
+    console.log("Exiting apply highlight");
 }
 
 function removeHighlight(color, WebsiteHostName) {
+    console.log("Entered remove highlight");
     let spans = document.querySelectorAll(`span[style*="background-color:${color}"]`);
     spans.forEach(span => {
-        span.style.backgroundColor = "transparent";
+        if (span.getAttribute('data-highlight-id')) {
+            span.parentNode.replaceChild(document.createTextNode(span.textContent), span);
+            chrome.runtime.sendMessage({
+                from: "contentScript",
+                subject: "removeHighlight",
+                color: color,
+                WebsiteHostName: WebsiteHostName,
+                id: span.getAttribute('data-highlight-id')
+            });
+        }
     });
-
-    chrome.runtime.sendMessage({
-        from: "contentScript",
-        subject: "removeHighlight",
-        color: color,
-        WebsiteHostName: WebsiteHostName
-    });
+    console.log("Exiting remove highlight");
 }
 
 // Enable partial selection
 function enablePartialSelection() {
     document.body.style.userSelect = "auto";
+    console.log("Partial selection activated");
 }
 
+
+function applyStoredHighlights(highlightedTexts) {
+    for (let color in highlightedTexts) {
+        if (highlightedTexts.hasOwnProperty(color)) {
+            let websiteHighlights = highlightedTexts[color][window.location.hostname];
+            if (websiteHighlights) {
+                websiteHighlights.forEach(highlight => {
+                    let span = document.createElement("span");
+                    span.style.backgroundColor = highlight.color;
+                    span.style.color = "inherit";
+                    span.textContent = highlight.text;
+                    span.setAttribute("data-highlight-id", highlight.id);
+
+                    let range = document.createRange();
+                    range.selectNodeContents(document.body);
+                    range.collapse(false);
+
+                    let nodes = getTextNodesIn(document.body);
+                    let startNode = findTextNode(nodes, highlight.text);
+                    if (startNode) {
+                        let range = document.createRange();
+                        range.setStart(startNode.node, startNode.startOffset);
+                        range.setEnd(startNode.node, startNode.startOffset + highlight.text.length);
+                        range.surroundContents(span);
+                    }
+                });
+            }
+        }
+    }
+}
+
+// Function to get all text nodes in a given node
+function getTextNodesIn(node) {
+    let textNodes = [];
+    if (node.nodeType == 3) {
+        textNodes.push(node);
+    } else {
+        let children = node.childNodes;
+        for (let i = 0; i < children.length; i++) {
+            textNodes.push.apply(textNodes, getTextNodesIn(children[i]));
+        }
+    }
+    return textNodes;
+}
+
+// Function to find the text node containing a specific text
+function findTextNode(nodes, text) {
+    for (let i = 0; i < nodes.length; i++) {
+        let node = nodes[i];
+        let nodeText = node.textContent;
+        let index = nodeText.indexOf(text);
+        if (index !== -1) {
+            return {
+                node: node,
+                startOffset: index
+            };
+        }
+    }
+    return null;
+}
+function loadHighlights() {
+    chrome.runtime.sendMessage({
+        from: "contentScript",
+        subject: "loadHighlights"
+    }, (response) => {
+        applyStoredHighlights(response);
+    });
+}
+document.addEventListener("DOMContentLoaded", loadHighlights);
 // Create and manage notes
 function createNote() {
+    console.log("Entering create note");
     const noteDiv = document.createElement('div');
     noteDiv.style.position = 'absolute';
     noteDiv.style.top = '100px';
@@ -109,7 +185,8 @@ function createNote() {
         if (e.key === 'Enter') {
             textarea.disabled = true;
             chrome.runtime.sendMessage({
-                action: 'savenote',
+                from: "contentScript",
+                subject: "savenote",
                 host: window.location.hostname,
                 noteContent: textarea.value,
                 notePosition: { top: noteDiv.style.top, left: noteDiv.style.left }
@@ -125,6 +202,7 @@ function createNote() {
             textarea.disabled = true;
         }
     });
+    console.log("Load note message sent");
 }
 
 function dragElement(element) {
@@ -158,8 +236,10 @@ function dragElement(element) {
 
 // Export page data as PDF
 function savePageAsPDF() {
+    console.log("Entered save as PDF");
     captureAndExportPage((response) => {
-        if (response.ok) {
+        if (response.success) {
+            console.log("Response is OK for PDF");
             const { annotations, notes } = response.data;
             const pdfContent = [];
 
@@ -185,12 +265,14 @@ function savePageAsPDF() {
             const doc = new jsPDF();
             doc.text(pdfContent.join('\n'), 10, 10);
             doc.save(`${document.title.replace(/\s+/g, '_')}.pdf`);
+            console.log("PDF created successfully");
         }
     });
 }
 
 // Function to capture and export the page as PDF
 function captureAndExportPage(callback) {
+    console.log("Entered the capture PDF function");
     const annotations = [];
     const notes = [];
 
@@ -222,12 +304,14 @@ function captureAndExportPage(callback) {
             notes
         }
     }, callback);
+    console.log("Message sent to service worker");
 }
 
 // Share annotated webpage data via email
 function sharePageAnnotations() {
     const annotations = [];
     const notes = [];
+    console.log("Entered share page");
 
     // Get all highlighted text
     document.querySelectorAll('span[data-highlight-id]').forEach(span => {
@@ -280,8 +364,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-    enablePartialSelection();
-
+enablePartialSelection();
 
 // Listen for messages from background or popup scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -290,12 +373,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             applyHighlight(request.color, request.websiteHostName);
         } else if (request.action === "highlightoff") {
             removeHighlight(request.color, request.websiteHostName);
-        }  else if (request.action === "createNote") {
-            createNote();
-        } else if (request.action === "savePDF") {
-            savePageAsPDF();
-        } else if (request.action === "sharePage") {
-            sharePageAnnotations();
         }
+    } else if (request.from === "addnote" && request.action === "createanote") {
+        createNote();
+    } else if (request.from === "contentScript" && request.action === "captureWebpage") {
+        savePageAsPDF();
+    } else if (request.from === "contentScript" && request.action === "shareWebpage") {
+        sharePageAnnotations();
     }
 });
