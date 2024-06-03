@@ -144,7 +144,7 @@ filterButton.addEventListener('click', () => {
 
         if (typeof chrome !== 'undefined' && chrome.tabs) {
 
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             
              const tabid = tabs[0].id
              const url = tabs[0].url;
