@@ -12,6 +12,14 @@
   "action": {
     "default_popup": "index.html"
   },
+
+  "web_accessible_resources": [
+    {
+        "resources": ["js/jspdf.umd.min.js"],
+        "matches": ["<all_urls>"]
+    }
+],
+
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"

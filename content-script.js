@@ -1,4 +1,9 @@
-// import { jsPDF } from 'js/jspdf.umd.min.js';
+function loadJsPDF(callback) {
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('js/jspdf.umd.min.js');
+    script.onload = callback;
+    document.head.appendChild(script);
+}
 
 function applyHighlight(color, WebsiteHostName) {
     console.log("Entered apply highlight");
@@ -46,7 +51,7 @@ function removeHighlight(color, WebsiteHostName) {
     console.log("Exiting remove highlight");
 }
 
-// Enable partial selection
+
 function enablePartialSelection() {
     document.body.style.userSelect = "auto";
     console.log("Partial selection activated");
@@ -83,7 +88,7 @@ function applyStoredHighlights(highlightedTexts) {
     }
 }
 
-// Function to get all text nodes in a given node
+
 function getTextNodesIn(node) {
     let textNodes = [];
     if (node.nodeType == 3) {
@@ -97,7 +102,7 @@ function getTextNodesIn(node) {
     return textNodes;
 }
 
-// Function to find the text node containing a specific text
+
 function findTextNode(nodes, text) {
     for (let i = 0; i < nodes.length; i++) {
         let node = nodes[i];
@@ -121,7 +126,7 @@ function loadHighlights() {
     });
 }
 document.addEventListener("DOMContentLoaded", loadHighlights);
-// Create and manage notes
+
 function createNote() {
     console.log("Entering create note");
     const noteDiv = document.createElement('div');
@@ -234,7 +239,6 @@ function dragElement(element) {
     }
 }
 
-// Export page data as PDF
 function savePageAsPDF() {
     console.log("Entered save as PDF");
     captureAndExportPage((response) => {
@@ -243,40 +247,47 @@ function savePageAsPDF() {
             const { annotations, notes } = response.data;
             const pdfContent = [];
 
-            // Add title and URL to the PDF
+           
             pdfContent.push(`Title: ${document.title}`);
             pdfContent.push(`URL: ${window.location.href}`);
             pdfContent.push('');
 
-            // Add annotations to the PDF
             pdfContent.push('Annotations:');
             annotations.forEach((annotation, index) => {
                 pdfContent.push(`${index + 1}. ${annotation.text} (Color: ${annotation.color})`);
             });
             pdfContent.push('');
 
-            // Add notes to the PDF
             pdfContent.push('Notes:');
             notes.forEach((note, index) => {
                 pdfContent.push(`${index + 1}. ${note.content}`);
             });
 
-            // Convert the content to PDF
+
+
+            loadJsPDF(() => {
+                const { jsPDF } = window.jspdf;
+                console.log(jsPDF);
             const doc = new jsPDF();
             doc.text(pdfContent.join('\n'), 10, 10);
             doc.save(`${document.title.replace(/\s+/g, '_')}.pdf`);
             console.log("PDF created successfully");
+
+            })
+
+
+
         }
     });
 }
 
-// Function to capture and export the page as PDF
+
 function captureAndExportPage(callback) {
     console.log("Entered the capture PDF function");
     const annotations = [];
     const notes = [];
 
-    // Get all highlighted text
+   
     document.querySelectorAll('span[data-highlight-id]').forEach(span => {
         annotations.push({
             text: span.textContent,
@@ -284,7 +295,7 @@ function captureAndExportPage(callback) {
         });
     });
 
-    // Get all notes
+   
     document.querySelectorAll('div[data-note="true"]').forEach(note => {
         const textarea = note.querySelector('textarea');
         notes.push({
@@ -293,7 +304,7 @@ function captureAndExportPage(callback) {
         });
     });
 
-    // Send the data to the service worker
+   
     chrome.runtime.sendMessage({
         from: 'contentScript',
         subject: 'captureWebpage',
@@ -307,13 +318,13 @@ function captureAndExportPage(callback) {
     console.log("Message sent to service worker");
 }
 
-// Share annotated webpage data via email
+
 function sharePageAnnotations() {
     const annotations = [];
     const notes = [];
     console.log("Entered share page");
 
-    // Get all highlighted text
+    
     document.querySelectorAll('span[data-highlight-id]').forEach(span => {
         annotations.push({
             text: span.textContent,
@@ -321,7 +332,7 @@ function sharePageAnnotations() {
         });
     });
 
-    // Get all notes
+    
     document.querySelectorAll('div[data-note="true"]').forEach(note => {
         const textarea = note.querySelector('textarea');
         notes.push({
@@ -330,7 +341,7 @@ function sharePageAnnotations() {
         });
     });
 
-    // Send the data to the service worker
+    
     chrome.runtime.sendMessage({
         from: 'contentScript',
         subject: 'shareWebpage',
@@ -349,7 +360,7 @@ function sharePageAnnotations() {
     });
 }
 
-// Bind functions to respective keyboard shortcuts
+
 document.addEventListener('keydown', (e) => {
     if (e.altKey && e.key === 'h') {
         applyHighlight('yellow', window.location.hostname);
@@ -366,7 +377,7 @@ document.addEventListener('keydown', (e) => {
 
 enablePartialSelection();
 
-// Listen for messages from background or popup scripts
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.from === "highlighter") {
         if (request.action === "highlighton") {

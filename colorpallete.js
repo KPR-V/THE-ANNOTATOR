@@ -36,7 +36,7 @@ export function initColorPallete(container) {
     };
 
     const sendMessageToTab = (tabId, color) => {
-        chrome.tabs.sendMessage(tabId, { color: { color } });
+        chrome.tabs.sendMessage(tabId, { color: color });
     };
 
     document.getElementById('colorPicker').addEventListener('change', (e) => {
