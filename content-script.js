@@ -131,8 +131,8 @@ function createNote() {
     console.log("Entering create note");
     const noteDiv = document.createElement('div');
     noteDiv.style.position = 'absolute';
-    noteDiv.style.top = '100px';
-    noteDiv.style.left = '100px';
+    noteDiv.style.top = '300px';
+    noteDiv.style.left = '360px';
     noteDiv.style.width = '200px';
     noteDiv.style.minHeight = '150px';
     noteDiv.style.border = '1px solid #000';
@@ -154,14 +154,14 @@ function createNote() {
     addButton.style.backgroundColor = 'yellow';
     addButton.style.cursor = 'pointer';
     addButton.style.padding = '8px';
-    addButton.style.borderRadius = '50%';
+    // addButton.style.borderRadius = '50%';
 
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Delete note';
     deleteButton.style.backgroundColor = 'red';
     deleteButton.style.cursor = 'pointer';
     deleteButton.style.padding = '8px';
-    deleteButton.style.borderRadius = '50%';
+    // deleteButton.style.borderRadius = '50%';
 
     nav.appendChild(addButton);
     nav.appendChild(deleteButton);
@@ -242,7 +242,7 @@ function dragElement(element) {
 function savePageAsPDF() {
     console.log("Entered save as PDF");
     captureAndExportPage((response) => {
-        if (response.success) {
+        if (response.ok) {
             console.log("Response is OK for PDF");
             const { annotations, notes } = response.data;
             const pdfContent = [];
@@ -352,7 +352,7 @@ function sharePageAnnotations() {
             notes
         }
     }, response => {
-        if (response.success) {
+        if (response.ok) {
             alert('Page annotations shared successfully!');
         } else {
             alert('Failed to share page annotations.');
