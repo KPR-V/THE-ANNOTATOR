@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadHighlights();
     loadNotes();
 });
+
 function loadJsPDF(callback) {
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('imported file/jspdf.umd.min.js');
@@ -67,7 +68,7 @@ function applyStoredHighlights(highlightedTexts) {
             if (websiteHighlights) {
                 websiteHighlights.forEach(highlight => {
                     let span = document.createElement("span");
-                    span.style.backgroundColor = highlight.color;
+                    span.style.backgroundColor = color;
                     span.style.color = "inherit";
                     span.textContent = highlight.text;
                     span.setAttribute("data-highlight-id", highlight.id);
@@ -90,10 +91,9 @@ function applyStoredHighlights(highlightedTexts) {
     }
 }
 
-
 function getTextNodesIn(node) {
     let textNodes = [];
-    if (node.nodeType == 3) {
+    if (node.nodeType === 3) {
         textNodes.push(node);
     } else {
         let children = node.childNodes;
@@ -127,7 +127,6 @@ function loadHighlights() {
         applyStoredHighlights(response);
     });
 }
-
 
 function createNote() {
     console.log("Entering create note");
@@ -233,8 +232,8 @@ function dragElement(element) {
         pos2 = pos4 - e.clientY;
         pos3 = e.clientX;
         pos4 = e.clientY;
-        element.style.top = `${element.offsetTop - pos2  }px`;
-        element.style.left = `${element.offsetLeft - pos1  }px`;
+        element.style.top = `${element.offsetTop - pos2}px`;
+        element.style.left = `${element.offsetLeft - pos1}px`;
     }
 
     function closeDragElement() {
@@ -242,7 +241,6 @@ function dragElement(element) {
         document.onmousemove = null;
     }
 }
-
 
 function loadNotes() {
     chrome.runtime.sendMessage({
@@ -327,7 +325,6 @@ function loadNotes() {
     });
 }
 
-
 function sharePageAnnotations() {
     const annotations = [];
     const notes = [];
@@ -365,7 +362,6 @@ function sharePageAnnotations() {
     });
 }
 
-
 document.addEventListener('keydown', (e) => {
     if (e.altKey && e.key === 'h') {
         applyHighlight('yellow', window.location.hostname);
@@ -381,7 +377,6 @@ document.addEventListener('keydown', (e) => {
 });
 
 enablePartialSelection();
-
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.from === "highlighter") {
@@ -429,6 +424,7 @@ function captureAndExportPage(callback) {
     }, callback);
     console.log("Message sent to service worker");
 }
+
 function savePageAsPDF() {
     console.log("Entered save as PDF");
     captureAndExportPage((response) => {

@@ -1,10 +1,6 @@
 let highlightedTexts = {};
 let notesData = {};
 
-
-
-
-
 function generatePDF(capturedImage, sendResponse) {
     sendResponse({ success: true });
     console.log("PDF response sent");
@@ -17,11 +13,6 @@ function sendEmailWithAnnotations(data) {
     chrome.tabs.create({ url: email });
 }
 
-
-
-
-
-
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.clear();
     chrome.storage.local.set({ highlightedTexts: {}, notesData: {} });
@@ -33,7 +24,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const { color, WebsiteHostName, selectedText, id, date } = message;
             if (!highlightedTexts[color]) {
                 highlightedTexts[color] = {};
-                chrome.storage.local.clear();
             }
             if (!highlightedTexts[color][WebsiteHostName]) {
                 highlightedTexts[color][WebsiteHostName] = [];
@@ -84,10 +74,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sendResponse({ status: "success", message: "Note deleted" });
                 });
             }
-        }
-
-       
-        else if (message.subject === "exportData") {
+        } else if (message.subject === "exportData") {
             const { host, url, title } = message;
             chrome.storage.local.get(["highlightedTexts", "notesData"], (data) => {
                 highlightedTexts = data.highlightedTexts || {};
@@ -111,22 +98,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
                 sendResponse(response);
             });
-        }
-
-        else if (message.subject === "captureWebpage") {
+        } else if (message.subject === "captureWebpage") {
             chrome.tabs.captureVisibleTab(null, {}, (dataUrl) => {
                 if (chrome.runtime.lastError) {
                     sendResponse({ success: false });
                 } else {
                     generatePDF(dataUrl, sendResponse);
                 }
-            })
-            }
-            
-
-    }
-
-    else if (message.from === "searchbar" && message.action === "search") {
+            });
+        }
+    } else if (message.from === "searchbar" && message.action === "search") {
         chrome.storage.local.get("highlightedTexts", (data) => {
             const { criteria, value } = message;
             const results = [];
@@ -146,8 +127,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
             chrome.tabs.sendMessage(sender.tab.id, { from: "searchbar", results });
         });
-        }
-
+    }
 
     return true;
 });
