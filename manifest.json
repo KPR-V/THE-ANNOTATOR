@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "description": "One stop solution for all your annotating needs",
   "icons": {
-    "16": "16.png.png",
-    "32": "32.png.png",
-    "48": "48.png.png",
-    "128": "128.png.png"
+    "16": "images/16.png.png",
+    "32": "images/32.png.png",
+    "48": "images/48.png.png",
+    "128": "images/128.png.png"
   },
   "action": {
     "default_popup": "index.html"
@@ -15,13 +15,13 @@
 
   "web_accessible_resources": [
     {
-        "resources": ["js/jspdf.umd.min.js"],
+        "resources": ["imported file/jspdf.umd.min.js"],
         "matches": ["<all_urls>"]
     }
 ],
 
   "background": {
-    "service_worker": "service-worker.js",
+    "service_worker": "extension's-files/service-worker.js",
     "type": "module"
   },
   "permissions": [
@@ -42,7 +42,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content-script.js"]
+      "js": ["extension's-files/content-script.js"]
     }
   ]
 }

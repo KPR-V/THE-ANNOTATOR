@@ -1,6 +1,6 @@
 function loadJsPDF(callback) {
     const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('js/jspdf.umd.min.js');
+    script.src = chrome.runtime.getURL('imported file/jspdf.umd.min.js');
     script.onload = callback;
     document.head.appendChild(script);
 }
