@@ -1,3 +1,7 @@
+document.addEventListener("DOMContentLoaded", () => {
+    loadHighlights();
+    loadNotes();
+});
 function loadJsPDF(callback) {
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('imported file/jspdf.umd.min.js');
@@ -51,12 +55,10 @@ function removeHighlight(color, WebsiteHostName) {
     console.log("Exiting remove highlight");
 }
 
-
 function enablePartialSelection() {
     document.body.style.userSelect = "auto";
     console.log("Partial selection activated");
 }
-
 
 function applyStoredHighlights(highlightedTexts) {
     for (let color in highlightedTexts) {
@@ -96,12 +98,11 @@ function getTextNodesIn(node) {
     } else {
         let children = node.childNodes;
         for (let i = 0; i < children.length; i++) {
-            textNodes.push.apply(textNodes, getTextNodesIn(children[i]));
+            textNodes.push(...getTextNodesIn(children[i]));
         }
     }
     return textNodes;
 }
-
 
 function findTextNode(nodes, text) {
     for (let i = 0; i < nodes.length; i++) {
@@ -117,6 +118,7 @@ function findTextNode(nodes, text) {
     }
     return null;
 }
+
 function loadHighlights() {
     chrome.runtime.sendMessage({
         from: "contentScript",
@@ -125,7 +127,7 @@ function loadHighlights() {
         applyStoredHighlights(response);
     });
 }
-document.addEventListener("DOMContentLoaded", loadHighlights);
+
 
 function createNote() {
     console.log("Entering create note");
@@ -154,14 +156,12 @@ function createNote() {
     addButton.style.backgroundColor = 'yellow';
     addButton.style.cursor = 'pointer';
     addButton.style.padding = '8px';
-    // addButton.style.borderRadius = '50%';
 
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Delete note';
     deleteButton.style.backgroundColor = 'red';
     deleteButton.style.cursor = 'pointer';
     deleteButton.style.padding = '8px';
-    // deleteButton.style.borderRadius = '50%';
 
     nav.appendChild(addButton);
     nav.appendChild(deleteButton);
@@ -189,10 +189,13 @@ function createNote() {
     textarea.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             textarea.disabled = true;
+            const noteId = noteDiv.getAttribute('data-note-id') || new Date().getTime().toString();
+            noteDiv.setAttribute('data-note-id', noteId);
             chrome.runtime.sendMessage({
                 from: "contentScript",
                 subject: "savenote",
                 host: window.location.hostname,
+                noteId: noteId,
                 noteContent: textarea.value,
                 notePosition: { top: noteDiv.style.top, left: noteDiv.style.left }
             });
@@ -204,6 +207,7 @@ function createNote() {
             textarea.value = response.noteContent;
             noteDiv.style.top = response.notePosition.top;
             noteDiv.style.left = response.notePosition.left;
+            noteDiv.setAttribute('data-note-id', response.noteId);
             textarea.disabled = true;
         }
     });
@@ -229,8 +233,8 @@ function dragElement(element) {
         pos2 = pos4 - e.clientY;
         pos3 = e.clientX;
         pos4 = e.clientY;
-        element.style.top = (element.offsetTop - pos2) + 'px';
-        element.style.left = (element.offsetLeft - pos1) + 'px';
+        element.style.top = `${element.offsetTop - pos2  }px`;
+        element.style.left = `${element.offsetLeft - pos1  }px`;
     }
 
     function closeDragElement() {
@@ -239,83 +243,88 @@ function dragElement(element) {
     }
 }
 
-function savePageAsPDF() {
-    console.log("Entered save as PDF");
-    captureAndExportPage((response) => {
-        if (response.ok) {
-            console.log("Response is OK for PDF");
-            const { annotations, notes } = response.data;
-            const pdfContent = [];
 
-           
-            pdfContent.push(`Title: ${document.title}`);
-            pdfContent.push(`URL: ${window.location.href}`);
-            pdfContent.push('');
-
-            pdfContent.push('Annotations:');
-            annotations.forEach((annotation, index) => {
-                pdfContent.push(`${index + 1}. ${annotation.text} (Color: ${annotation.color})`);
-            });
-            pdfContent.push('');
-
-            pdfContent.push('Notes:');
-            notes.forEach((note, index) => {
-                pdfContent.push(`${index + 1}. ${note.content}`);
-            });
-
-
-
-            loadJsPDF(() => {
-                const { jsPDF } = window.jspdf;
-                console.log(jsPDF);
-            const doc = new jsPDF();
-            doc.text(pdfContent.join('\n'), 10, 10);
-            doc.save(`${document.title.replace(/\s+/g, '_')}.pdf`);
-            console.log("PDF created successfully");
-
-            })
-
-
-
-        }
-    });
-}
-
-
-function captureAndExportPage(callback) {
-    console.log("Entered the capture PDF function");
-    const annotations = [];
-    const notes = [];
-
-   
-    document.querySelectorAll('span[data-highlight-id]').forEach(span => {
-        annotations.push({
-            text: span.textContent,
-            color: span.style.backgroundColor
-        });
-    });
-
-   
-    document.querySelectorAll('div[data-note="true"]').forEach(note => {
-        const textarea = note.querySelector('textarea');
-        notes.push({
-            content: textarea.value,
-            position: { top: note.style.top, left: note.style.left }
-        });
-    });
-
-   
+function loadNotes() {
     chrome.runtime.sendMessage({
-        from: 'contentScript',
-        subject: 'captureWebpage',
-        data: {
-            title: document.title,
-            url: window.location.href,
-            annotations,
-            notes
+        from: "contentScript",
+        subject: "loadNotes",
+        host: window.location.hostname
+    }, (response) => {
+        if (response) {
+            response.forEach(noteData => {
+                const noteDiv = document.createElement('div');
+                noteDiv.style.position = 'absolute';
+                noteDiv.style.top = noteData.notePosition.top;
+                noteDiv.style.left = noteData.notePosition.left;
+                noteDiv.style.width = '200px';
+                noteDiv.style.minHeight = '150px';
+                noteDiv.style.border = '1px solid #000';
+                noteDiv.style.backgroundColor = '#fff';
+                noteDiv.style.zIndex = 1000;
+                noteDiv.style.resize = 'both';
+                noteDiv.style.overflow = 'auto';
+                noteDiv.style.padding = '10px';
+                noteDiv.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+                noteDiv.setAttribute("data-note-id", noteData.noteId);
+                noteDiv.setAttribute("data-note", "true");
+
+                const nav = document.createElement('nav');
+                nav.style.display = 'flex';
+                nav.style.justifyContent = 'space-between';
+                nav.style.minHeight = '10vh';
+
+                const addButton = document.createElement('button');
+                addButton.textContent = 'Add text';
+                addButton.style.backgroundColor = 'yellow';
+                addButton.style.cursor = 'pointer';
+                addButton.style.padding = '8px';
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete note';
+                deleteButton.style.backgroundColor = 'red';
+                deleteButton.style.cursor = 'pointer';
+                deleteButton.style.padding = '8px';
+
+                nav.appendChild(addButton);
+                nav.appendChild(deleteButton);
+                noteDiv.appendChild(nav);
+
+                const textarea = document.createElement('textarea');
+                textarea.style.width = '100%';
+                textarea.style.minHeight = '100px';
+                textarea.value = noteData.noteContent;
+                textarea.disabled = true;
+                noteDiv.appendChild(textarea);
+
+                document.body.appendChild(noteDiv);
+                dragElement(noteDiv);
+
+                addButton.addEventListener('click', () => {
+                    textarea.disabled = false;
+                    textarea.focus();
+                });
+
+                deleteButton.addEventListener('click', () => {
+                    document.body.removeChild(noteDiv);
+                    chrome.runtime.sendMessage({ from: "contentScript", action: 'deletenote', host: window.location.hostname, noteId: noteData.noteId });
+                });
+
+                textarea.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        textarea.disabled = true;
+                        chrome.runtime.sendMessage({
+                            from: "contentScript",
+                            subject: "savenote",
+                            host: window.location.hostname,
+                            noteId: noteData.noteId,
+                            noteContent: textarea.value,
+                            notePosition: { top: noteDiv.style.top, left: noteDiv.style.left }
+                        });
+                    }
+                });
+            });
         }
-    }, callback);
-    console.log("Message sent to service worker");
+    });
 }
 
 
@@ -323,8 +332,6 @@ function sharePageAnnotations() {
     const annotations = [];
     const notes = [];
     console.log("Entered share page");
-
-    
     document.querySelectorAll('span[data-highlight-id]').forEach(span => {
         annotations.push({
             text: span.textContent,
@@ -332,7 +339,6 @@ function sharePageAnnotations() {
         });
     });
 
-    
     document.querySelectorAll('div[data-note="true"]').forEach(note => {
         const textarea = note.querySelector('textarea');
         notes.push({
@@ -341,7 +347,6 @@ function sharePageAnnotations() {
         });
     });
 
-    
     chrome.runtime.sendMessage({
         from: 'contentScript',
         subject: 'shareWebpage',
@@ -393,3 +398,69 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sharePageAnnotations();
     }
 });
+
+function captureAndExportPage(callback) {
+    console.log("Entered the capture PDF function");
+    const annotations = [];
+    const notes = [];
+    document.querySelectorAll('span[data-highlight-id]').forEach(span => {
+        annotations.push({
+            text: span.textContent,
+            color: span.style.backgroundColor
+        });
+    });
+    document.querySelectorAll('div[data-note="true"]').forEach(note => {
+        const textarea = note.querySelector('textarea');
+        notes.push({
+            content: textarea.value,
+            position: { top: note.style.top, left: note.style.left }
+        });
+    });
+    chrome.runtime.sendMessage({
+        from: 'contentScript',
+        subject: 'captureWebpage',
+        data: {
+            title: document.title,
+            url: window.location.href,
+            annotations,
+            notes,
+            host: window.location.hostname
+        }
+    }, callback);
+    console.log("Message sent to service worker");
+}
+function savePageAsPDF() {
+    console.log("Entered save as PDF");
+    captureAndExportPage((response) => {
+        if (response.ok) {
+            console.log("Response is OK for PDF");
+            const { annotations, notes } = response.data;
+
+            const pdfContent = [];
+            pdfContent.push(`Title: ${document.title}`);
+            pdfContent.push(`URL: ${window.location.href}`);
+            pdfContent.push('');
+
+            pdfContent.push('Annotations:');
+            annotations.forEach((annotation, index) => {
+                pdfContent.push(`${index + 1}. ${annotation.text} (Color: ${annotation.color})`);
+            });
+            pdfContent.push('');
+
+            pdfContent.push('Notes:');
+            notes.forEach((note, index) => {
+                pdfContent.push(`${index + 1}. ${note.content}`);
+            });
+
+            loadJsPDF(() => {
+                const { jsPDF } = window.jspdf;
+                console.log(jsPDF);
+                const doc = new jsPDF();
+                doc.text(pdfContent.join('\n'), 10, 10);
+                doc.save('annotated_page.pdf');
+            });
+        } else {
+            console.log("Error capturing and exporting page:", response.error);
+        }
+    });
+}

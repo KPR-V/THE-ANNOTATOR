@@ -1,91 +1,131 @@
+let highlightedTexts = {};
+let notesData = {};
+
+
+
+
+
+function generatePDF(capturedImage, sendResponse) {
+    sendResponse({ success: true });
+    console.log("PDF response sent");
+}
+
+function sendEmailWithAnnotations(data) {
+    const email = "mailto:?subject=Annotated Page&body=" + encodeURIComponent(
+        `Title: ${data.title}\n\nURL: ${data.url}\n\nAnnotations:\n${data.annotations.map(a => `Text: ${a.text}, Color: ${a.color}`).join('\n')}\n\nNotes:\n${data.notes.map(n => `Content: ${n.content}, Position: ${JSON.stringify(n.position)}`).join('\n')}`
+    );
+    chrome.tabs.create({ url: email });
+}
+
+
+
+
+
+
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.clear();
-    console.log("Local storage cleared");
+    chrome.storage.local.set({ highlightedTexts: {}, notesData: {} });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.from === "contentScript") {
-        
-        
         if (message.subject === "applyHighlight") {
-            console.log("Apply highlight command received");
-            chrome.storage.local.get("highlightedTexts", (data) => {
-                let highlightedTexts = data.highlightedTexts || {};
-                highlightedTexts[message.color] = highlightedTexts[message.color] || {};
-                highlightedTexts[message.color][message.WebsiteHostName] = highlightedTexts[message.color][message.WebsiteHostName] || [];
-                highlightedTexts[message.color][message.WebsiteHostName].push({
-                    text: message.selectedText,
-                    date: new Date().toISOString(),
-                    id: message.id,
-                    color: message.color
-                });
+            const { color, WebsiteHostName, selectedText, id, date } = message;
+            if (!highlightedTexts[color]) {
+                highlightedTexts[color] = {};
+                chrome.storage.local.clear();
+            }
+            if (!highlightedTexts[color][WebsiteHostName]) {
+                highlightedTexts[color][WebsiteHostName] = [];
+            }
+            highlightedTexts[color][WebsiteHostName].push({ text: selectedText, id, date });
+
+            chrome.storage.local.set({ highlightedTexts }, () => {
+                sendResponse({ status: "success", message: "Highlight saved" });
+            });
+        } else if (message.subject === "removeHighlight") {
+            const { color, WebsiteHostName, id } = message;
+            if (highlightedTexts[color] && highlightedTexts[color][WebsiteHostName]) {
+                highlightedTexts[color][WebsiteHostName] = highlightedTexts[color][WebsiteHostName].filter(h => h.id !== id);
                 chrome.storage.local.set({ highlightedTexts }, () => {
-                    sendResponse({ success: true });
-                    console.log("Response sent and data stored");
-                });
-            });
-            return true; 
-        } 
-        
-        
-        
-        else if (message.subject === "removeHighlight") {
-            console.log("Remove highlight command received");
-            chrome.storage.local.get("highlightedTexts", (data) => {
-                let highlightedTexts = data.highlightedTexts || {};
-                if (highlightedTexts[message.color] && highlightedTexts[message.color][message.WebsiteHostName]) {
-                    highlightedTexts[message.color][message.WebsiteHostName] = highlightedTexts[message.color][message.WebsiteHostName].filter(highlight => highlight.id !== message.id);
-                    chrome.storage.local.set({ highlightedTexts }, () => {
-                        sendResponse({ success: true });
-                        console.log("Highlight removed and response sent");
-                    });
-                }
-            });
-            return true;
-        } 
-        
-        
-        
-        else if (message.subject === "loadHighlights") {
-            chrome.storage.local.get("highlightedTexts", (data) => {
-                sendResponse(data.highlightedTexts || {});
-                console.log("Highlights data sent");
-            });
-            return true;
-        } 
-        
-        
-        else if (message.subject === "savenote") {
-            chrome.storage.local.get('notes', (data) => {
-                let notes = data.notes || {};
-                notes[message.host] = {
-                    noteContent: message.noteContent,
-                    notePosition: message.notePosition
-                };
-                chrome.storage.local.set({ notes }, () => {
-                    sendResponse({ success: true });
-                    console.log("Note saved");
-                });
-            });
-            return true;
-        }
-    } 
-    
-    
-    else if (message.action === 'deletenote') {
-        console.log("Delete note command received");
-        chrome.storage.local.get('notes', (data) => {
-            let notes = data.notes || {};
-            if (notes[message.host]) {
-                delete notes[message.host];
-                chrome.storage.local.set({ notes }, () => {
-                    sendResponse({ success: true });
-                    console.log("Note deleted and response sent");
+                    sendResponse({ status: "success", message: "Highlight removed" });
                 });
             }
-        });
-        return true;
-    } 
+        } else if (message.subject === "loadHighlights") {
+            chrome.storage.local.get("highlightedTexts", (data) => {
+                highlightedTexts = data.highlightedTexts || {};
+                sendResponse(highlightedTexts);
+            });
+        } else if (message.subject === "savenote") {
+            const { host, noteId, noteContent, notePosition } = message;
+            if (!notesData[host]) {
+                notesData[host] = [];
+            }
+            const noteIndex = notesData[host].findIndex(note => note.noteId === noteId);
+            if (noteIndex > -1) {
+                notesData[host][noteIndex] = { noteId, noteContent, notePosition };
+            } else {
+                notesData[host].push({ noteId, noteContent, notePosition });
+            }
+            chrome.storage.local.set({ notesData }, () => {
+                sendResponse({ status: "success", message: "Note saved" });
+            });
+        } else if (message.subject === "loadNotes") {
+            const { host } = message;
+            chrome.storage.local.get("notesData", (data) => {
+                notesData = data.notesData || {};
+                sendResponse(notesData[host] || []);
+            });
+        } else if (message.action === 'deletenote') {
+            const { host, noteId } = message;
+            if (notesData[host]) {
+                notesData[host] = notesData[host].filter(note => note.noteId !== noteId);
+                chrome.storage.local.set({ notesData }, () => {
+                    sendResponse({ status: "success", message: "Note deleted" });
+                });
+            }
+        }
+
+       
+        else if (message.subject === "exportData") {
+            const { host, url, title } = message;
+            chrome.storage.local.get(["highlightedTexts", "notesData"], (data) => {
+                highlightedTexts = data.highlightedTexts || {};
+                notesData = data.notesData || {};
+                const response = {
+                    ok: true,
+                    data: {
+                        annotations: [],
+                        notes: []
+                    }
+                };
+                for (let color in highlightedTexts) {
+                    if (highlightedTexts[color][host]) {
+                        highlightedTexts[color][host].forEach((annotation) => {
+                            response.data.annotations.push({ ...annotation, color });
+                        });
+                    }
+                }
+                if (notesData[host]) {
+                    response.data.notes = notesData[host];
+                }
+                sendResponse(response);
+            });
+        }
+
+        else if (message.subject === "captureWebpage") {
+            chrome.tabs.captureVisibleTab(null, {}, (dataUrl) => {
+                if (chrome.runtime.lastError) {
+                    sendResponse({ success: false });
+                } else {
+                    generatePDF(dataUrl, sendResponse);
+                }
+            })
+            }
+            
+
+    }
+
     else if (message.from === "searchbar" && message.action === "search") {
         chrome.storage.local.get("highlightedTexts", (data) => {
             const { criteria, value } = message;
@@ -107,37 +147,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             chrome.tabs.sendMessage(sender.tab.id, { from: "searchbar", results });
         });
         }
-        else if (message.from === "contentScript" && message.subject === "captureWebpage") {
-            chrome.tabs.captureVisibleTab(null, {}, (dataUrl) => {
-                if (chrome.runtime.lastError) {
-                    sendResponse({ success: false });
-                } else {
-                    generatePDF(dataUrl, sendResponse);
-                }
-            })
-            }
-    else if (message.action === 'loadnote') {
-        console.log("Load note command received");
-        chrome.storage.local.get('notes', (data) => {
-            const noteData = data.notes ? data.notes[message.host] : null;
-            sendResponse(noteData);
-            console.log("Note data sent");
-        });
-        return true;
-    }
+
+
+    return true;
 });
-
-function generatePDF(capturedImage, sendResponse) {
-    // var doc = new jsPDF();
-    // doc.addImage(capturedImage, 'JPEG', 10, 10, 180, 120); 
-    // doc.save('annotated_page.pdf');
-    sendResponse({ success: true });
-    console.log("PDF response sent");
-}
-
-function sendEmailWithAnnotations(data) {
-    const email = "mailto:?subject=Annotated Page&body=" + encodeURIComponent(
-        `Title: ${data.title}\n\nURL: ${data.url}\n\nAnnotations:\n${data.annotations.map(a => `Text: ${a.text}, Color: ${a.color}`).join('\n')}\n\nNotes:\n${data.notes.map(n => `Content: ${n.content}, Position: ${JSON.stringify(n.position)}`).join('\n')}`
-    );
-    chrome.tabs.create({ url: email });
-}
