@@ -124,7 +124,11 @@ function loadHighlights() {
         from: "contentScript",
         subject: "loadHighlights"
     }, (response) => {
-        applyStoredHighlights(response);
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+        } else {
+            applyStoredHighlights(response);
+        }
     });
 }
 
@@ -428,7 +432,9 @@ function captureAndExportPage(callback) {
 function savePageAsPDF() {
     console.log("Entered save as PDF");
     captureAndExportPage((response) => {
-        if (response.ok) {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+        } else if (response.ok) {
             console.log("Response is OK for PDF");
             const { annotations, notes } = response.data;
 
