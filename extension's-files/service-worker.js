@@ -1,18 +1,6 @@
 let highlightedTexts = {};
 let notesData = {};
 
-function generatePDF(capturedImage, sendResponse) {
-    sendResponse({ success: true });
-    console.log("PDF response sent");
-}
-
-function sendEmailWithAnnotations(data) {
-    const email = "mailto:?subject=Annotated Page&body=" + encodeURIComponent(
-        `Title: ${data.title}\n\nURL: ${data.url}\n\nAnnotations:\n${data.annotations.map(a => `Text: ${a.text}, Color: ${a.color}`).join('\n')}\n\nNotes:\n${data.notes.map(n => `Content: ${n.content}, Position: ${JSON.stringify(n.position)}`).join('\n')}`
-    );
-    chrome.tabs.create({ url: email });
-}
-
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.clear();
     chrome.storage.local.set({ highlightedTexts: {}, notesData: {} });
@@ -42,8 +30,13 @@ function handleContentScriptMessage(message, sendResponse) {
             loadNotes(message, sendResponse);
         } else if (message.action === 'deletenote') {
             deleteNote(message, sendResponse);
-        } else if (message.subject === "exportData") {
+        } else if (message.subject === "shareWebpage") {
             exportData(message, sendResponse);
+        } else if (message.subject === "shareWebpageAsPDF") {
+            exportDataAsPDF(message, () => {
+                openGmailWithPDF();
+                sendResponse({ ok: true });
+            });
         } else if (message.subject === "captureWebpage") {
             captureWebpage(sendResponse);
         }
@@ -175,11 +168,69 @@ function exportData(message, sendResponse) {
             if (notesData[host]) {
                 response.data.notes = notesData[host];
             }
-            sendResponse(response);
+            sendResponse(response, { ok: true });
+        }
+    });
+    return true; // keep the message channel open to the sender until sendResponse is called
+}
+
+function exportDataAsPDF(message, sendResponse) {
+    importScripts(chrome.runtime.getURL('imported file/jspdf.umd.min.js'));
+    const { jsPDF } = window.jspdf;
+    const { data } = message;
+    const doc = new jsPDF();
+    let y = 10;
+
+    doc.text(`Title: ${data.title}`, 10, y);
+    y += 10;
+    doc.text(`URL: ${data.url}`, 10, y);
+    y += 10;
+    doc.text('Annotations:', 10, y);
+    y += 10;
+
+    data.annotations.forEach((annotation, index) => {
+        doc.text(`${index + 1}. ${annotation.text} (Color: ${annotation.color})`, 10, y);
+        y += 10;
+    });
+
+    y += 10;
+    doc.text('Notes:', 10, y);
+    y += 10;
+
+    data.notes.forEach((note, index) => {
+        doc.text(`${index + 1}. ${note.content} (Position: Top ${note.position.top}, Left ${note.position.left})`, 10, y);
+        y += 10;
+    });
+
+    // Save the PDF to local storage
+    const pdfData = doc.output('blob');
+    chrome.storage.local.set({ pdfData }, () => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+            sendResponse({ status: "error", message: chrome.runtime.lastError.message });
+        } else {
+            sendResponse({ status: "success" });
         }
     });
 }
 
+function openGmailWithPDF() {
+    chrome.storage.local.get("pdfData", (data) => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+            alert('Failed to retrieve PDF data from local storage.');
+        } else {
+            const pdfData = data.pdfData;
+            const reader = new FileReader();
+            reader.onload = function() {
+                const base64PDF = reader.result.split(',')[1];
+                const email = `mailto:?subject=${encodeURIComponent('PDF with annotations and notes')}&body=${encodeURIComponent('Please find the attached PDF with the annotations and notes.')}&attachment=${base64PDF}`;
+                chrome.tabs.create({ url: email });
+            };
+            reader.readAsDataURL(pdfData);
+        }
+    });
+}
 
 let lastCaptureTime = 0;
 const CAPTURE_INTERVAL = 1000; // 1 second interval
@@ -203,11 +254,15 @@ function captureWebpage(sendResponse) {
     });
 }
 
-
-
-
-
-
+function generatePDF(dataUrl, sendResponse) {
+    importScripts(chrome.runtime.getURL('imported file/jspdf.umd.min.js'));
+    const { jsPDF } = window.jspdf;
+    const imgData = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, "");
+    const pdf = new jsPDF();
+    pdf.addImage(imgData, 'JPEG', 0, 0);
+    const output = pdf.output('datauristring');
+    sendResponse({ success: true, pdf: output });
+}
 
 function handleSearchbarMessage(message, sender, sendResponse) {
     chrome.storage.local.get("highlightedTexts", (data) => {

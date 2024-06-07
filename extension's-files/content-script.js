@@ -350,7 +350,7 @@ function sharePageAnnotations() {
 
     chrome.runtime.sendMessage({
         from: 'contentScript',
-        subject: 'shareWebpage',
+        subject: 'shareWebpageAsPDF',
         data: {
             title: document.title,
             url: window.location.href,
@@ -386,16 +386,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.from === "highlighter") {
         if (request.action === "highlighton") {
             applyHighlight(request.color, request.websiteHostName);
+            sendResponse({status: 'Highlight applied'});
         } else if (request.action === "highlightoff") {
             removeHighlight(request.color, request.websiteHostName);
+            sendResponse({status: 'Highlight removed'});
         }
     } else if (request.from === "addnote" && request.action === "createanote") {
         createNote();
+        sendResponse({status: 'Note created'});
     } else if (request.from === "contentScript" && request.action === "captureWebpage") {
         savePageAsPDF();
+        sendResponse({status: 'Webpage captured'});
     } else if (request.from === "contentScript" && request.action === "shareWebpage") {
         sharePageAnnotations();
+        sendResponse({status: 'Webpage shared'});
     }
+    return true; // keep the message channel open until sendResponse is called
 });
 
 function captureAndExportPage(callback) {
