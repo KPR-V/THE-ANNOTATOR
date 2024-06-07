@@ -43,7 +43,9 @@ function removeHighlight(color, WebsiteHostName) {
     let spans = document.querySelectorAll(`span[style*="background-color:${color}"]`);
     spans.forEach(span => {
         if (span.getAttribute('data-highlight-id')) {
-            span.parentNode.replaceChild(document.createTextNode(span.textContent), span);
+            let parent = span.parentNode;
+            let textNode = document.createTextNode(span.textContent);
+            parent.replaceChild(textNode, span);
             chrome.runtime.sendMessage({
                 from: "contentScript",
                 subject: "removeHighlight",
@@ -382,24 +384,27 @@ document.addEventListener('keydown', (e) => {
 
 enablePartialSelection();
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.from === "highlighter") {
-        if (request.action === "highlighton") {
-            applyHighlight(request.color, request.websiteHostName);
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.highlight) {
+        if (message.highlight.action === 'highlighton') {
+            applyHighlight(message.highlight.color, message.highlight.websiteHostName);
             sendResponse({status: 'Highlight applied'});
-        } else if (request.action === "highlightoff") {
-            removeHighlight(request.color, request.websiteHostName);
+        } else if (message.highlight.action === 'highlightoff') {
+            removeHighlight(message.highlight.color, message.highlight.websiteHostName);
             sendResponse({status: 'Highlight removed'});
         }
-    } else if (request.from === "addnote" && request.action === "createanote") {
+    } else if (message.from === 'addnote' && message.action === 'createanote') {
         createNote();
         sendResponse({status: 'Note created'});
-    } else if (request.from === "contentScript" && request.action === "captureWebpage") {
+    } else if (message.from === 'contentScript' && message.action === 'captureWebpage') {
         savePageAsPDF();
         sendResponse({status: 'Webpage captured'});
-    } else if (request.from === "contentScript" && request.action === "shareWebpage") {
+    } else if (message.from === 'contentScript' && message.action === 'shareWebpage') {
         sharePageAnnotations();
         sendResponse({status: 'Webpage shared'});
+    } else if (message.from === 'searchbar' && message.action === 'search') {
+        applyFilter(message.criteria, message.value);
+        sendResponse({status: 'Filter applied'});
     }
     return true; // keep the message channel open until sendResponse is called
 });

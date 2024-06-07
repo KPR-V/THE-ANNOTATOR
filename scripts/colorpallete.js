@@ -28,10 +28,10 @@ export function initColorPallete(container) {
     };
 
     const saveColorInfo = (hostname, url, color, tabId) => {
-        chrome.storage.local.set({
-            colorinfo: {
-                [hostname]: { color, url, tabId }
-            }
+        chrome.storage.local.get('colorinfo', (data) => {
+            let colorinfo = data.colorinfo || {};
+            colorinfo[hostname] = { color, url, tabId };
+            chrome.storage.local.set({ colorinfo });
         });
     };
 
@@ -42,6 +42,13 @@ export function initColorPallete(container) {
     document.getElementById('colorPicker').addEventListener('change', (e) => {
         const selectedColor = e.target.value;
         updateColorInfo(selectedColor);
+
+        // Send the new color on change without saving it
+        if (typeof chrome !== 'undefined' && chrome.tabs) {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                sendMessageToTab(tabs[0].id, selectedColor ? selectedColor : '#ffff00');
+            });
+        }
     });
 
     document.getElementById('saveColor').addEventListener('click', () => {
@@ -71,7 +78,6 @@ export function initColorPallete(container) {
                 const url = tabs[0].url;
                 const hostname = new URL(url).hostname;
                 saveColorInfo(hostname, url, hex, tabs[0].id);
-                sendMessageToTab(tabs[0].id, hex);
             });
         }
     });
