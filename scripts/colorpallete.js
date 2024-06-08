@@ -1,10 +1,10 @@
 export function initColorPallete(container) {
     container.innerHTML = `
         <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 16px;">Color Palette Selector</h1>
-        <input type="color" id="colorPicker" value="#ffff00" style="display: block; margin: 0 auto; margin-bottom: 16px; background-color: #3f3f46;">
+        <input type="color" id="colorPicker" style="display: block; margin: 0 auto; margin-bottom: 16px; background-color: #3f3f46;">
         <div id="colorInfo">
-            <p>HEX: <span id="hexValue">#ffff00</span></p>
-            <p>RGBA: <span id="rgbaValue">rgba(255, 255, 0, 1)</span></p>
+            <p>HEX: <span id="hexValue"></span></p>
+            <p>RGBA: <span id="rgbaValue"></span></p>
         </div>
         <button id="saveColor">Save Color</button>
         <div id="savedColors">
@@ -17,6 +17,7 @@ export function initColorPallete(container) {
         const rgba = hexToRgba(hex);
         document.getElementById('hexValue').innerText = hex;
         document.getElementById('rgbaValue').innerText = rgba;
+        document.getElementById('colorPicker').value = hex;
     };
 
     const hexToRgba = (hex) => {
@@ -39,9 +40,14 @@ export function initColorPallete(container) {
         chrome.tabs.sendMessage(tabId, { color: color });
     };
 
+    const saveCurrentColor = (hex) => {
+        chrome.storage.local.set({ currentColor: hex });
+    };
+
     document.getElementById('colorPicker').addEventListener('change', (e) => {
         const selectedColor = e.target.value;
         updateColorInfo(selectedColor);
+        saveCurrentColor(selectedColor);
 
         // Send the new color on change without saving it
         if (typeof chrome !== 'undefined' && chrome.tabs) {
@@ -66,13 +72,12 @@ export function initColorPallete(container) {
         colorDiv.title = `HEX: ${hex}\nRGBA: ${rgba}`;
         colorDiv.setAttribute('data-hex', hex);
         colorDiv.addEventListener('click', () => {
-            document.getElementById('colorPicker').value = hex;
             updateColorInfo(hex);
+            saveCurrentColor(hex);
         });
 
         savedcolors1.insertBefore(colorDiv, savedcolors1.firstChild);
 
-        
         if (typeof chrome !== 'undefined' && chrome.tabs) {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 const url = tabs[0].url;
@@ -82,13 +87,18 @@ export function initColorPallete(container) {
         }
     });
 
-    
     if (typeof chrome !== 'undefined' && chrome.tabs) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             const url = tabs[0].url;
             const hostname = new URL(url).hostname;
 
-            chrome.storage.local.get('colorinfo', (data) => {
+            chrome.storage.local.get(['colorinfo', 'currentColor'], (data) => {
+                if (data.currentColor) {
+                    updateColorInfo(data.currentColor);
+                } else {
+                    updateColorInfo('#ffff00');
+                }
+
                 if (data.colorinfo && data.colorinfo[hostname]) {
                     const { color } = data.colorinfo[hostname];
                     updateColorInfo(color);

@@ -1,11 +1,10 @@
-export function saveaspdf(){
-
+export function saveaspdf() {
     document.getElementById('save').addEventListener('click', () => {
         if (typeof chrome !== 'undefined' && chrome.tabs) {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 const activeTab = tabs[0];
                 chrome.tabs.sendMessage(activeTab.id, { from: "contentScript", action: "captureWebpage" }, (response) => {
-                    if (response && response.success) {
+                    if (response && response.status === 'Webpage captured') {
                         console.log('Page saved successfully.');
                     } else {
                         console.log('Failed to save the page.');
@@ -16,8 +15,4 @@ export function saveaspdf(){
             console.log("Chrome API is not available.");
         }
     });
-
-
-
-
 }

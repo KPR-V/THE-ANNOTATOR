@@ -15,14 +15,13 @@
 
   "web_accessible_resources": [
     {
-        "resources": ["imported file/jspdf.umd.min.js"],
+        "resources": ["extension-files/imported_file/jspdf.umd.min.js"],
         "matches": ["<all_urls>"]
     }
 ],
 
   "background": {
-    "service_worker": "extension's-files/service-worker.js",
-    "type": "module"
+    "service_worker": "extension-files/service-worker.js"
   },
   "permissions": [
     "activeTab",
@@ -42,7 +41,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["extension's-files/content-script.js"]
+      "js": ["extension-files/content-script.js"]
     }
   ]
 }

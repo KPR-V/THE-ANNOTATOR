@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function loadJsPDF(callback) {
     const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('imported file/jspdf.umd.min.js');
+    script.src = chrome.runtime.getURL('extension-files/imported_file/jspdf.umd.min.js');
     script.onload = callback;
     document.head.appendChild(script);
 }
@@ -330,7 +330,6 @@ function loadNotes() {
         }
     });
 }
-
 function sharePageAnnotations() {
     const annotations = [];
     const notes = [];
@@ -341,7 +340,6 @@ function sharePageAnnotations() {
             color: span.style.backgroundColor
         });
     });
-
     document.querySelectorAll('div[data-note="true"]').forEach(note => {
         const textarea = note.querySelector('textarea');
         notes.push({
@@ -349,7 +347,6 @@ function sharePageAnnotations() {
             position: { top: note.style.top, left: note.style.left }
         });
     });
-
     chrome.runtime.sendMessage({
         from: 'contentScript',
         subject: 'shareWebpageAsPDF',
@@ -368,49 +365,7 @@ function sharePageAnnotations() {
     });
 }
 
-document.addEventListener('keydown', (e) => {
-    if (e.altKey && e.key === 'h') {
-        applyHighlight('yellow', window.location.hostname);
-    } else if (e.altKey && e.key === 'r') {
-        removeHighlight('yellow', window.location.hostname);
-    } else if (e.altKey && e.key === 'n') {
-        createNote();
-    } else if (e.altKey && e.key === 's') {
-        savePageAsPDF();
-    } else if (e.altKey && e.key === 'e') {
-        sharePageAnnotations();
-    }
-});
-
-enablePartialSelection();
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.highlight) {
-        if (message.highlight.action === 'highlighton') {
-            applyHighlight(message.highlight.color, message.highlight.websiteHostName);
-            sendResponse({status: 'Highlight applied'});
-        } else if (message.highlight.action === 'highlightoff') {
-            removeHighlight(message.highlight.color, message.highlight.websiteHostName);
-            sendResponse({status: 'Highlight removed'});
-        }
-    } else if (message.from === 'addnote' && message.action === 'createanote') {
-        createNote();
-        sendResponse({status: 'Note created'});
-    } else if (message.from === 'contentScript' && message.action === 'captureWebpage') {
-        savePageAsPDF();
-        sendResponse({status: 'Webpage captured'});
-    } else if (message.from === 'contentScript' && message.action === 'shareWebpage') {
-        sharePageAnnotations();
-        sendResponse({status: 'Webpage shared'});
-    } else if (message.from === 'searchbar' && message.action === 'search') {
-        applyFilter(message.criteria, message.value);
-        sendResponse({status: 'Filter applied'});
-    }
-    return true; // keep the message channel open until sendResponse is called
-});
-
 function captureAndExportPage(callback) {
-    console.log("Entered the capture PDF function");
     const annotations = [];
     const notes = [];
     document.querySelectorAll('span[data-highlight-id]').forEach(span => {
@@ -443,37 +398,51 @@ function captureAndExportPage(callback) {
 function savePageAsPDF() {
     console.log("Entered save as PDF");
     captureAndExportPage((response) => {
-        if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError);
-        } else if (response.ok) {
-            console.log("Response is OK for PDF");
-            const { annotations, notes } = response.data;
-
-            const pdfContent = [];
-            pdfContent.push(`Title: ${document.title}`);
-            pdfContent.push(`URL: ${window.location.href}`);
-            pdfContent.push('');
-
-            pdfContent.push('Annotations:');
-            annotations.forEach((annotation, index) => {
-                pdfContent.push(`${index + 1}. ${annotation.text} (Color: ${annotation.color})`);
-            });
-            pdfContent.push('');
-
-            pdfContent.push('Notes:');
-            notes.forEach((note, index) => {
-                pdfContent.push(`${index + 1}. ${note.content}`);
-            });
-
-            loadJsPDF(() => {
-                const { jsPDF } = window.jspdf;
-                console.log(jsPDF);
-                const doc = new jsPDF();
-                doc.text(pdfContent.join('\n'), 10, 10);
-                doc.save('annotated_page.pdf');
-            });
+        if (response.ok) {
+            console.log('Page saved successfully.');
         } else {
-            console.log("Error capturing and exporting page:", response.error);
+            console.log('Failed to save the page:', response.message);
         }
     });
 }
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.highlight) {
+        if (message.highlight.action === 'highlighton') {
+            applyHighlight(message.highlight.color, message.highlight.websiteHostName);
+            sendResponse({ status: 'Highlight applied' });
+        } else if (message.highlight.action === 'highlightoff') {
+            removeHighlight(message.highlight.color, message.highlight.websiteHostName);
+            sendResponse({ status: 'Highlight removed' });
+        }
+    } else if (message.from === 'addnote' && message.action === 'createanote') {
+        createNote();
+        sendResponse({ status: 'Note created' });
+    } else if (message.from === 'contentScript' && message.action === 'captureWebpage') {
+        savePageAsPDF();
+        sendResponse({ status: 'Webpage captured' });
+    } else if (message.from === 'contentScript' && message.action === 'shareWebpage') {
+        sharePageAnnotations();
+        sendResponse({ status: 'Webpage shared' });
+    } else if (message.from === 'searchbar' && message.action === 'search') {
+        applyFilter(message.criteria, message.value);
+        sendResponse({ status: 'Filter applied' });
+    }
+    return true; // keep the message channel open until sendResponse is called
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.altKey && e.key === 'h') {
+        applyHighlight('yellow', window.location.hostname);
+    } else if (e.altKey && e.key === 'r') {
+        removeHighlight('yellow', window.location.hostname);
+    } else if (e.altKey && e.key === 'n') {
+        createNote();
+    } else if (e.altKey && e.key === 's') {
+        savePageAsPDF();
+    } else if (e.altKey && e.key === 'e') {
+        sharePageAnnotations();
+    }
+});
+
+enablePartialSelection();

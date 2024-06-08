@@ -1,5 +1,9 @@
+importScripts(chrome.runtime.getURL('extension-files/imported_file/jspdf.umd.min.js'));
+
 let highlightedTexts = {};
 let notesData = {};
+let lastCaptureTime = 0;
+const CAPTURE_INTERVAL = 1000; // 1 second interval
 
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.clear();
@@ -9,40 +13,51 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.from === "contentScript") {
         handleContentScriptMessage(message, sendResponse);
+        return true;
     } else if (message.from === "searchbar" && message.action === "search") {
         handleSearchbarMessage(message, sender, sendResponse);
+        return true;
     }
-
     return true; // Indicates that sendResponse will be called asynchronously
 });
 
 function handleContentScriptMessage(message, sendResponse) {
     try {
-        if (message.subject === "applyHighlight") {
-            applyHighlight(message, sendResponse);
-        } else if (message.subject === "removeHighlight") {
-            removeHighlight(message, sendResponse);
-        } else if (message.subject === "loadHighlights") {
-            loadHighlights(sendResponse);
-        } else if (message.subject === "savenote") {
-            saveNote(message, sendResponse);
-        } else if (message.subject === "loadNotes") {
-            loadNotes(message, sendResponse);
-        } else if (message.action === 'deletenote') {
-            deleteNote(message, sendResponse);
-        } else if (message.subject === "shareWebpage") {
-            exportData(message, sendResponse);
-        } else if (message.subject === "shareWebpageAsPDF") {
-            exportDataAsPDF(message, () => {
-                openGmailWithPDF();
-                sendResponse({ ok: true });
-            });
-        } else if (message.subject === "captureWebpage") {
-            captureWebpage(sendResponse);
+        switch (message.subject) {
+            case "applyHighlight":
+                applyHighlight(message, sendResponse);
+                break;
+            case "removeHighlight":
+                removeHighlight(message, sendResponse);
+                break;
+            case "loadHighlights":
+                loadHighlights(sendResponse);
+                break;
+            case "savenote":
+                saveNote(message, sendResponse);
+                break;
+            case "loadNotes":
+                loadNotes(message, sendResponse);
+                break;
+            case "deletenote":
+                deleteNote(message, sendResponse);
+                break;
+            case "shareWebpage":
+                exportData(message, sendResponse);
+                break;
+            case "shareWebpageAsPDF":
+                exportDataAsPDF(message, () => {
+                    openGmailWithPDF();
+                    sendResponse({ ok: true });
+                });
+                break;
+            case "captureWebpage":
+                captureWebpage(sendResponse);
+                break;
         }
     } catch (error) {
         console.error('Error handling content script message:', error);
-        if (sendResponse) sendResponse({ status: "error", message: error.message });
+        sendResponse({ status: "error", message: error.message });
     }
 }
 
@@ -143,14 +158,14 @@ function deleteNote(message, sendResponse) {
 }
 
 function exportData(message, sendResponse) {
-    const { host, url, title } = message;
+    const { host } = message;
     chrome.storage.local.get(["highlightedTexts", "notesData"], (data) => {
         if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
             sendResponse({ status: "error", message: chrome.runtime.lastError.message });
         } else {
-            highlightedTexts = data.highlightedTexts || {};
-            notesData = data.notesData || {};
+            const highlightedTexts = data.highlightedTexts || {};
+            const notesData = data.notesData || {};
             const response = {
                 ok: true,
                 data: {
@@ -168,15 +183,13 @@ function exportData(message, sendResponse) {
             if (notesData[host]) {
                 response.data.notes = notesData[host];
             }
-            sendResponse(response, { ok: true });
+            sendResponse(response);
         }
     });
-    return true; // keep the message channel open to the sender until sendResponse is called
+    return true;
 }
-
 function exportDataAsPDF(message, sendResponse) {
-    importScripts(chrome.runtime.getURL('imported file/jspdf.umd.min.js'));
-    const { jsPDF } = window.jspdf;
+    const { jsPDF } = self.jspdf;
     const { data } = message;
     const doc = new jsPDF();
     let y = 10;
@@ -202,38 +215,19 @@ function exportDataAsPDF(message, sendResponse) {
         y += 10;
     });
 
-    // Save the PDF to local storage
-    const pdfData = doc.output('blob');
-    chrome.storage.local.set({ pdfData }, () => {
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new Blob([pdfBlob], { type: 'application/pdf' });
+
+    chrome.storage.local.set({ pdfData: pdfFile }, () => {
         if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
             sendResponse({ status: "error", message: chrome.runtime.lastError.message });
         } else {
             sendResponse({ status: "success" });
+            downloadPDF(sendResponse);
         }
     });
 }
-
-function openGmailWithPDF() {
-    chrome.storage.local.get("pdfData", (data) => {
-        if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError);
-            alert('Failed to retrieve PDF data from local storage.');
-        } else {
-            const pdfData = data.pdfData;
-            const reader = new FileReader();
-            reader.onload = function() {
-                const base64PDF = reader.result.split(',')[1];
-                const email = `mailto:?subject=${encodeURIComponent('PDF with annotations and notes')}&body=${encodeURIComponent('Please find the attached PDF with the annotations and notes.')}&attachment=${base64PDF}`;
-                chrome.tabs.create({ url: email });
-            };
-            reader.readAsDataURL(pdfData);
-        }
-    });
-}
-
-let lastCaptureTime = 0;
-const CAPTURE_INTERVAL = 1000; // 1 second interval
 
 function captureWebpage(sendResponse) {
     const now = Date.now();
@@ -255,13 +249,37 @@ function captureWebpage(sendResponse) {
 }
 
 function generatePDF(dataUrl, sendResponse) {
-    importScripts(chrome.runtime.getURL('imported file/jspdf.umd.min.js'));
-    const { jsPDF } = window.jspdf;
-    const imgData = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, "");
+    const { jsPDF } = self.jspdf;
     const pdf = new jsPDF();
-    pdf.addImage(imgData, 'JPEG', 0, 0);
-    const output = pdf.output('datauristring');
-    sendResponse({ success: true, pdf: output });
+    pdf.addImage(dataUrl, 'JPEG', 0, 0);
+    const pdfBlob = pdf.output('blob');
+    sendResponse({ success: true, pdf: pdfBlob });
+}
+
+function openGmailWithPDF() {
+    chrome.storage.local.get("pdfData", (data) => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+            console.error('Failed to retrieve PDF data from local storage.');
+            return;
+        }
+
+        const pdfData = data.pdfData;
+
+        if (!(pdfData instanceof Blob)) {
+            console.error('Stored pdfData is not a Blob');
+            console.error('Failed to retrieve valid PDF data.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function() {
+            const base64PDF = reader.result.split(',')[1];
+            const email = `mailto:mail.google.com?subject=${encodeURIComponent('PDF with annotations and notes')}&body=${encodeURIComponent('Please find the attached PDF with the annotations and notes.')}&attachment=${base64PDF}`;
+            chrome.tabs.create({ active: true, url: email });
+        };
+        reader.readAsDataURL(pdfData);
+    });
 }
 
 function handleSearchbarMessage(message, sender, sendResponse) {
@@ -294,6 +312,39 @@ function handleSearchbarMessage(message, sender, sendResponse) {
                     sendResponse({ status: "success", message: "Search completed", results: response });
                 }
             });
+        }
+    });
+}
+
+function downloadPDF(sendResponse) {
+    chrome.storage.local.get("pdfData", (data) => {
+        if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+            sendResponse({ status: "error", message: chrome.runtime.lastError.message });
+        } else {
+            const pdfData = data.pdfData;
+            if (pdfData instanceof Blob) {
+                const fileReader = new FileReader();
+                fileReader.onloadend = function() {
+                    const url = fileReader.result;
+                    chrome.downloads.download({
+                        url: url,
+                        filename: 'annotations_notes.pdf',
+                        saveAs: true
+                    }, (downloadId) => {
+                        if (chrome.runtime.lastError) {
+                            console.error(chrome.runtime.lastError);
+                            sendResponse({ status: "error", message: chrome.runtime.lastError.message });
+                        } else {
+                            sendResponse({ status: "success", downloadId: downloadId });
+                        }
+                    });
+                };
+                fileReader.readAsDataURL(pdfData);
+            } else {
+                console.error('Stored pdfData is not a Blob');
+                sendResponse({ status: "error", message: "Stored pdfData is not a Blob" });
+            }
         }
     });
 }
