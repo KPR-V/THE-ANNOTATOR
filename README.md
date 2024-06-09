@@ -59,8 +59,5 @@ We welcome contributions from the community! Here's how you can help:
 
 
 
-For any questions or feedback, please open an issue on GitHub.
-
----
 
 Thank you for using THE-ANNOTATOR!
