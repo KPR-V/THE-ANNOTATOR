@@ -6,7 +6,6 @@ THE-ANNOTATOR is a browser extension designed to facilitate annotation and highl
 
 - Highlight Text: Select and highlight text on any web page.
 - Annotations: Add  notes to highlighted sections.
-- Save Annotations: Store your highlights and annotations for later reference.
 - User-friendly Interface: Intuitive design for ease of use.
 
 ## Installation
